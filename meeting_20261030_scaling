@@ -1,0 +1,1564 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>FDTD Scaling解析モデル</title>
+
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
+  <style>
+    body {
+      font-family: "Yu Gothic", "Hiragino Sans", "Meiryo", sans-serif;
+      margin: 0;
+      background: #f7f8fb;
+      color: #222;
+    }
+
+    .header {
+      padding: 18px 24px 8px 24px;
+    }
+
+    h1 {
+      margin: 0 0 8px 0;
+      font-size: 28px;
+    }
+
+    .subtitle {
+      color: #555;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .summary {
+      margin-top: 12px;
+      padding: 12px 14px;
+      background: #ffffff;
+      border: 1px solid #dde3ee;
+      border-radius: 10px;
+      font-size: 14px;
+      line-height: 1.8;
+    }
+
+    .controls {
+      margin-top: 12px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .controls span {
+      font-weight: bold;
+      margin-right: 4px;
+    }
+
+    button {
+      border: 1px solid #aeb8c8;
+      background: #ffffff;
+      padding: 8px 14px;
+      border-radius: 7px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    button:hover {
+      background: #eef3f9;
+    }
+
+    button.active {
+      background: #2f5d9b;
+      color: #ffffff;
+      border-color: #2f5d9b;
+    }
+
+    .container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      padding: 12px 24px 12px 24px;
+    }
+
+    .panel {
+      background: #ffffff;
+      border: 1px solid #dde3ee;
+      border-radius: 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+      overflow: hidden;
+    }
+
+    .panel h2 {
+      margin: 0;
+      padding: 14px 16px 6px 16px;
+      font-size: 20px;
+    }
+
+    .panel p {
+      margin: 0;
+      padding: 0 16px 8px 16px;
+      font-size: 13px;
+      color: #555;
+      line-height: 1.6;
+    }
+
+    .plot {
+      width: 100%;
+      height: 650px;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      padding: 0 14px 14px 14px;
+    }
+
+    .metric {
+      background: #f5f7fb;
+      border: 1px solid #dde3ee;
+      border-radius: 8px;
+      padding: 9px;
+      text-align: center;
+    }
+
+    .metric-label {
+      color: #666;
+      font-size: 12px;
+    }
+
+    .metric-value {
+      font-size: 18px;
+      font-weight: bold;
+      margin-top: 3px;
+    }
+
+    .timing {
+      margin: 4px 24px 24px 24px;
+      background: #ffffff;
+      border: 1px solid #dde3ee;
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+
+    .timing h2 {
+      font-size: 20px;
+      margin: 0 0 10px 0;
+    }
+
+    .timing-flow {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 9px;
+      font-size: 14px;
+      margin-top: 12px;
+    }
+
+    .timing-box {
+      padding: 8px 11px;
+      border-radius: 7px;
+      background: #eef3f9;
+      border: 1px solid #cad4e3;
+      font-family: monospace;
+    }
+
+    .arrow {
+      font-size: 20px;
+      color: #777;
+    }
+
+    .note {
+      margin-top: 12px;
+      font-size: 13px;
+      color: #555;
+      line-height: 1.7;
+    }
+
+    code {
+      background: #eef2f7;
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+
+    @media (max-width: 1100px) {
+      .container {
+        grid-template-columns: 1fr;
+      }
+
+      .plot {
+        height: 560px;
+      }
+    }
+  </style>
+</head>
+
+
+<body>
+
+<div class="header">
+
+  <h1>FDTD Scaling解析モデル</h1>
+
+  <div class="subtitle">
+    左: Strong scaling / 右: Weak scaling<br>
+    GPU数を変更し, 解析領域の分割方法とglobal domainの変化を3次元で表示する.
+  </div>
+
+
+  <div class="summary">
+
+    <b>共通解析条件</b><br>
+
+    入射波:
+    <code>30 GHz</code>,
+    <code>+x方向</code>,
+    <code>Ey偏波</code><br>
+
+    格子幅:
+    <code>dx = 50 um</code><br>
+
+    水球:
+    <code>R = 100 cells = 5.0 mm</code><br>
+
+    水:
+    <code>2極Debyeモデル, 27 degC</code><br>
+
+    PML:
+    <code>15 cells / side</code><br>
+
+    計算精度:
+    <code>float32</code><br>
+
+    GPU:
+    <code>NVIDIA A100-PCIE-40GB</code><br>
+
+    測定:
+    <code>warmup 10 steps</code>,
+    <code>100 steps</code>,
+    <code>3 runsのmedian</code>
+
+  </div>
+
+
+  <div class="controls">
+
+    <span>GPU数:</span>
+
+    <button id="gpu1" onclick="setGPUCount(1)">1 GPU</button>
+    <button id="gpu2" onclick="setGPUCount(2)">2 GPU</button>
+    <button id="gpu3" onclick="setGPUCount(3)">3 GPU</button>
+    <button id="gpu4" onclick="setGPUCount(4)">4 GPU</button>
+
+  </div>
+
+</div>
+
+
+<div class="container">
+
+
+  <!-- Strong scaling -->
+  <div class="panel">
+
+    <h2>Strong scaling</h2>
+
+    <p>
+      global problem sizeを固定し, GPU数のみを増加させる.
+      physical領域は640<sup>3</sup> cells,
+      PML込みでは670<sup>3</sup> cellsで固定する.
+    </p>
+
+    <div id="strongPlot" class="plot"></div>
+
+    <div class="metrics">
+
+      <div class="metric">
+        <div class="metric-label">time / step</div>
+        <div class="metric-value" id="strongTime">-</div>
+      </div>
+
+      <div class="metric">
+        <div class="metric-label">speedup</div>
+        <div class="metric-value" id="strongSpeedup">-</div>
+      </div>
+
+      <div class="metric">
+        <div class="metric-label">parallel efficiency</div>
+        <div class="metric-value" id="strongEfficiency">-</div>
+      </div>
+
+    </div>
+
+  </div>
+
+
+  <!-- Weak scaling -->
+  <div class="panel">
+
+    <h2>Weak scaling</h2>
+
+    <p>
+      1 GPUあたりのlocal problem sizeを固定し,
+      GPU数に比例してglobal domainをZ方向へ拡大する.
+      local padded gridは830 x 830 x 416 cells / rankである.
+    </p>
+
+    <div id="weakPlot" class="plot"></div>
+
+    <div class="metrics">
+
+      <div class="metric">
+        <div class="metric-label">time / step</div>
+        <div class="metric-value" id="weakTime">-</div>
+      </div>
+
+      <div class="metric">
+        <div class="metric-label">weak efficiency</div>
+        <div class="metric-value" id="weakEfficiency">-</div>
+      </div>
+
+      <div class="metric">
+        <div class="metric-label">global padded grid</div>
+        <div class="metric-value" id="weakGrid">-</div>
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+
+<!-- Timing -->
+<div class="timing">
+
+  <h2>計算時間の測定方法</h2>
+
+  <div>
+    10 stepsのwarmup後に, MPI rankおよびGPUを同期してから計測を開始する.
+  </div>
+
+  <div class="timing-flow">
+
+    <div class="timing-box">MPI_Barrier</div>
+
+    <div class="arrow">&rarr;</div>
+
+    <div class="timing-box">cudaDeviceSynchronize</div>
+
+    <div class="arrow">&rarr;</div>
+
+    <div class="timing-box">MPI_Barrier</div>
+
+    <div class="arrow">&rarr;</div>
+
+    <div class="timing-box">MPI_Wtime</div>
+
+    <div class="arrow">&rarr;</div>
+
+    <div class="timing-box">100 steps</div>
+
+    <div class="arrow">&rarr;</div>
+
+    <div class="timing-box">cudaDeviceSynchronize</div>
+
+    <div class="arrow">&rarr;</div>
+
+    <div class="timing-box">MPI_Barrier</div>
+
+    <div class="arrow">&rarr;</div>
+
+    <div class="timing-box">MPI_Wtime</div>
+
+  </div>
+
+
+  <div class="note">
+
+    <b>MPI_Barrier:</b>
+    すべてのMPI rankが同じ地点に到達するまで待機し,
+    rank間の計測開始時刻をそろえる.<br>
+
+    <b>cudaDeviceSynchronize:</b>
+    GPU上で発行済みのkernelやmemory copyがすべて終了するまで待機し,
+    warmup中のGPU処理が測定区間に残らないようにする.<br>
+
+    <b>MPI_Wtime:</b>
+    測定開始時刻および終了時刻を取得する.<br><br>
+
+    測定区間には,
+    分散媒質の畳み込み計算,
+    入射波の計算,
+    電界の更新,
+    電界に対するPML処理およびhalo通信,
+    磁界の更新,
+    磁界に対するPML処理およびhalo通信を含む.<br>
+
+    メモリ確保や初期化など,
+    解析開始時に一度だけ行われる処理は測定区間には含めていない.
+
+  </div>
+
+</div>
+
+
+
+<script>
+
+/* ================================================================
+   Parameters
+   ================================================================ */
+
+const common = {
+
+  pml: 15,
+
+  dx_mm: 0.05,
+
+  sphereRadiusCell: 100
+
+};
+
+
+/* Strong scaling:
+   physical = 640^3
+   padded   = 670^3
+*/
+
+const strong = {
+
+  Nx: 670,
+  Ny: 670,
+  Nz: 670,
+
+  physical: 640,
+
+  times_ms: [
+    55.31,
+    29.02,
+    20.96,
+    16.71
+  ],
+
+  speedup: [
+    1.000,
+    1.906,
+    2.639,
+    3.309
+  ],
+
+  efficiency: [
+    100.0,
+    95.3,
+    88.0,
+    82.7
+  ]
+
+};
+
+
+/* Weak scaling:
+   local padded grid = 830 x 830 x 416 / rank
+*/
+
+const weak = {
+
+  Nx: 830,
+  Ny: 830,
+
+  NzLocal: 416,
+
+  times_ms: [
+    52.54,
+    54.19,
+    58.92,
+    59.20
+  ],
+
+  efficiency: [
+    100.00,
+    96.96,
+    89.17,
+    88.76
+  ]
+
+};
+
+
+const colors = [
+
+  '#4C78A8',
+  '#F58518',
+  '#54A24B',
+  '#E45756'
+
+];
+
+
+let currentGPUCount = 1;
+
+
+/* ================================================================
+   Geometry helper functions
+   ================================================================ */
+
+function boxEdges(x0, x1, y0, y1, z0, z1) {
+
+  const pts = [
+
+    [x0,y0,z0],
+    [x1,y0,z0],
+    [x1,y1,z0],
+    [x0,y1,z0],
+    [x0,y0,z0],
+
+    [x0,y0,z1],
+    [x1,y0,z1],
+    [x1,y1,z1],
+    [x0,y1,z1],
+    [x0,y0,z1],
+
+    [x1,y0,z1],
+    [x1,y0,z0],
+
+    [x1,y1,z0],
+    [x1,y1,z1],
+
+    [x0,y1,z1],
+    [x0,y1,z0]
+
+  ];
+
+  return {
+
+    x: pts.map(p => p[0]),
+    y: pts.map(p => p[1]),
+    z: pts.map(p => p[2])
+
+  };
+
+}
+
+
+function cuboidMesh(x0, x1, y0, y1, z0, z1) {
+
+  const x = [
+    x0,x1,x1,x0,
+    x0,x1,x1,x0
+  ];
+
+  const y = [
+    y0,y0,y1,y1,
+    y0,y0,y1,y1
+  ];
+
+  const z = [
+    z0,z0,z0,z0,
+    z1,z1,z1,z1
+  ];
+
+  const i = [
+    0,0,0,1,1,2,
+    4,4,5,2,3,6
+  ];
+
+  const j = [
+    1,2,4,2,5,3,
+    5,6,6,6,7,7
+  ];
+
+  const k = [
+    2,4,1,5,2,7,
+    6,7,1,3,0,3
+  ];
+
+  return {x,y,z,i,j,k};
+
+}
+
+
+function sphereMesh(cx, cy, cz, r, nu=36, nv=22) {
+
+  let x = [];
+  let y = [];
+  let z = [];
+
+  for (let j = 0; j <= nv; j++) {
+
+    const v = Math.PI * j / nv;
+
+    for (let i = 0; i <= nu; i++) {
+
+      const u = 2 * Math.PI * i / nu;
+
+      x.push(
+        cx + r * Math.cos(u) * Math.sin(v)
+      );
+
+      y.push(
+        cy + r * Math.sin(u) * Math.sin(v)
+      );
+
+      z.push(
+        cz + r * Math.cos(v)
+      );
+
+    }
+
+  }
+
+
+  let I = [];
+  let J = [];
+  let K = [];
+
+  for (let j = 0; j < nv; j++) {
+
+    for (let i = 0; i < nu; i++) {
+
+      const a = j * (nu + 1) + i;
+      const b = a + 1;
+      const c = a + (nu + 1);
+      const d = c + 1;
+
+      I.push(a);
+      J.push(b);
+      K.push(c);
+
+      I.push(b);
+      J.push(d);
+      K.push(c);
+
+    }
+
+  }
+
+  return {
+
+    x: x,
+    y: y,
+    z: z,
+
+    i: I,
+    j: J,
+    k: K
+
+  };
+
+}
+
+
+/* Integer-balanced slab decomposition.
+   Example:
+   670 / 3 -> 224, 223, 223
+*/
+
+function balancedSlabs(total, ranks) {
+
+  const base = Math.floor(total / ranks);
+
+  const rem = total % ranks;
+
+  let slabs = [];
+
+  let start = 0;
+
+  for (let r = 0; r < ranks; r++) {
+
+    const n = base + (r < rem ? 1 : 0);
+
+    const end = start + n;
+
+    slabs.push({
+
+      rank: r,
+      z0: start,
+      z1: end,
+      count: n
+
+    });
+
+    start = end;
+
+  }
+
+  return slabs;
+
+}
+
+
+/* ================================================================
+   Halo boundary plane
+   ================================================================ */
+
+function haloBoundaryTrace(Nx, Ny, z) {
+
+  const e = boxEdges(
+    0, Nx,
+    0, Ny,
+    z, z
+  );
+
+  return {
+
+    type: 'scatter3d',
+
+    mode: 'lines',
+
+    x: e.x,
+    y: e.y,
+    z: e.z,
+
+    line: {
+      color: '#c62828',
+      width: 5
+    },
+
+    showlegend: false,
+
+    hoverinfo: 'skip'
+
+  };
+
+}
+
+
+/* ================================================================
+   Strong scaling plot
+   ================================================================ */
+
+function makeStrongPlot(p) {
+
+  const Nx = strong.Nx;
+  const Ny = strong.Ny;
+  const Nz = strong.Nz;
+
+  const cx = Nx / 2;
+  const cy = Ny / 2;
+  const cz = Nz / 2;
+
+
+  const data = [];
+
+
+  /* Rank domains */
+
+  const slabs = balancedSlabs(
+    Nz,
+    p
+  );
+
+
+  slabs.forEach((s, idx) => {
+
+    const cub = cuboidMesh(
+      0, Nx,
+      0, Ny,
+      s.z0,
+      s.z1
+    );
+
+    data.push({
+
+      type: 'mesh3d',
+
+      x: cub.x,
+      y: cub.y,
+      z: cub.z,
+
+      i: cub.i,
+      j: cub.j,
+      k: cub.k,
+
+      color: colors[idx],
+
+      opacity: 0.24,
+
+      flatshading: true,
+
+      name:
+        `Rank ${idx} / GPU ${idx}`,
+
+      hovertemplate:
+        `Rank ${idx}<br>` +
+        `Z = ${s.z0} -- ${s.z1-1}<br>` +
+        `${s.count} planes` +
+        `<extra></extra>`
+
+    });
+
+  });
+
+
+  /* Halo boundaries */
+
+  for (let r = 0; r < slabs.length - 1; r++) {
+
+    data.push(
+      haloBoundaryTrace(
+        Nx,
+        Ny,
+        slabs[r].z1
+      )
+    );
+
+  }
+
+
+  /* PML inner boundary */
+
+  const inner = boxEdges(
+
+    common.pml,
+    Nx - common.pml,
+
+    common.pml,
+    Ny - common.pml,
+
+    common.pml,
+    Nz - common.pml
+
+  );
+
+  data.push({
+
+    type: 'scatter3d',
+
+    mode: 'lines',
+
+    x: inner.x,
+    y: inner.y,
+    z: inner.z,
+
+    line: {
+      color: '#27a0db',
+      width: 5,
+      dash: 'dash'
+    },
+
+    name: 'physical domain'
+
+  });
+
+
+  /* Outer box */
+
+  const outer = boxEdges(
+    0, Nx,
+    0, Ny,
+    0, Nz
+  );
+
+  data.push({
+
+    type: 'scatter3d',
+
+    mode: 'lines',
+
+    x: outer.x,
+    y: outer.y,
+    z: outer.z,
+
+    line: {
+      color: '#1f1f1f',
+      width: 5
+    },
+
+    name: 'padded domain'
+
+  });
+
+
+  /* Water sphere */
+
+  const sphere = sphereMesh(
+
+    cx,
+    cy,
+    cz,
+
+    common.sphereRadiusCell
+
+  );
+
+  data.push({
+
+    type: 'mesh3d',
+
+    x: sphere.x,
+    y: sphere.y,
+    z: sphere.z,
+
+    i: sphere.i,
+    j: sphere.j,
+    k: sphere.k,
+
+    color: '#2ca02c',
+
+    opacity: 0.55,
+
+    name: 'water sphere',
+
+    hovertemplate:
+      'water sphere<br>R = 100 cells = 5 mm<extra></extra>'
+
+  });
+
+
+  /* Incident wave */
+
+  data.push({
+
+    type: 'scatter3d',
+
+    mode: 'lines+text',
+
+    x: [-100, 40],
+    y: [cy, cy],
+    z: [cz, cz],
+
+    line: {
+      color: '#d62728',
+      width: 8
+    },
+
+    text: [
+      '',
+      '+x incident wave'
+    ],
+
+    textposition: 'top center',
+
+    textfont: {
+      color: '#d62728',
+      size: 14
+    },
+
+    name: 'incident wave',
+
+    hoverinfo: 'skip'
+
+  });
+
+
+  const layout = {
+
+    margin: {
+      l: 0,
+      r: 0,
+      t: 20,
+      b: 0
+    },
+
+    showlegend: true,
+
+    legend: {
+
+      orientation: 'h',
+
+      x: 0.01,
+      y: 1.02,
+
+      bgcolor:
+        'rgba(255,255,255,0.8)'
+
+    },
+
+    scene: {
+
+      aspectmode: 'cube',
+
+      xaxis: {
+
+        title: 'x [cell]',
+
+        range: [
+          -110,
+          Nx + 40
+        ]
+
+      },
+
+      yaxis: {
+
+        title: 'y [cell]',
+
+        range: [
+          0,
+          Ny
+        ]
+
+      },
+
+      zaxis: {
+
+        title: 'z [cell]',
+
+        range: [
+          0,
+          Nz
+        ]
+
+      },
+
+      camera: {
+
+        eye: {
+          x: 1.55,
+          y: 1.40,
+          z: 1.20
+        }
+
+      }
+
+    },
+
+    annotations: [
+
+      {
+
+        x: 0.02,
+        y: 0.02,
+
+        xref: 'paper',
+        yref: 'paper',
+
+        showarrow: false,
+
+        align: 'left',
+
+        bgcolor:
+          'rgba(255,255,255,0.85)',
+
+        bordercolor:
+          '#ccd4df',
+
+        text:
+          `<b>Fixed global domain</b><br>` +
+          `physical: 640^3 cells<br>` +
+          `padded: 670^3 cells<br>` +
+          `GPU count: ${p}`
+
+      }
+
+    ]
+
+  };
+
+
+  Plotly.react(
+    'strongPlot',
+    data,
+    layout,
+    {
+      responsive: true,
+      displaylogo: false
+    }
+  );
+
+
+  document.getElementById(
+    'strongTime'
+  ).innerText =
+    strong.times_ms[p-1].toFixed(2)
+    + ' ms';
+
+
+  document.getElementById(
+    'strongSpeedup'
+  ).innerText =
+    strong.speedup[p-1].toFixed(3)
+    + ' x';
+
+
+  document.getElementById(
+    'strongEfficiency'
+  ).innerText =
+    strong.efficiency[p-1].toFixed(1)
+    + ' %';
+
+}
+
+
+/* ================================================================
+   Weak scaling plot
+   ================================================================ */
+
+function makeWeakPlot(p) {
+
+  const Nx = weak.Nx;
+  const Ny = weak.Ny;
+
+  const Nz =
+    weak.NzLocal * p;
+
+  const cx =
+    Nx / 2;
+
+  const cy =
+    Ny / 2;
+
+  const cz =
+    Nz / 2;
+
+
+  const data = [];
+
+
+  /* Each rank has exactly 416 planes */
+
+  for (let r = 0; r < p; r++) {
+
+    const z0 =
+      r * weak.NzLocal;
+
+    const z1 =
+      (r + 1) * weak.NzLocal;
+
+
+    const cub = cuboidMesh(
+
+      0, Nx,
+
+      0, Ny,
+
+      z0, z1
+
+    );
+
+
+    data.push({
+
+      type: 'mesh3d',
+
+      x: cub.x,
+      y: cub.y,
+      z: cub.z,
+
+      i: cub.i,
+      j: cub.j,
+      k: cub.k,
+
+      color:
+        colors[r],
+
+      opacity:
+        0.25,
+
+      flatshading:
+        true,
+
+      name:
+        `Rank ${r} / GPU ${r}`,
+
+      hovertemplate:
+        `Rank ${r}<br>` +
+        `local grid = 830 x 830 x 416<br>` +
+        `Z = ${z0} -- ${z1-1}` +
+        `<extra></extra>`
+
+    });
+
+
+    if (r > 0) {
+
+      data.push(
+
+        haloBoundaryTrace(
+          Nx,
+          Ny,
+          z0
+        )
+
+      );
+
+    }
+
+  }
+
+
+  /* Physical domain excluding external PML */
+
+  const inner = boxEdges(
+
+    common.pml,
+    Nx - common.pml,
+
+    common.pml,
+    Ny - common.pml,
+
+    common.pml,
+    Nz - common.pml
+
+  );
+
+
+  data.push({
+
+    type: 'scatter3d',
+
+    mode: 'lines',
+
+    x: inner.x,
+    y: inner.y,
+    z: inner.z,
+
+    line: {
+      color: '#27a0db',
+      width: 5,
+      dash: 'dash'
+    },
+
+    name:
+      'physical domain'
+
+  });
+
+
+  /* Outer padded domain */
+
+  const outer = boxEdges(
+
+    0, Nx,
+
+    0, Ny,
+
+    0, Nz
+
+  );
+
+
+  data.push({
+
+    type: 'scatter3d',
+
+    mode: 'lines',
+
+    x: outer.x,
+    y: outer.y,
+    z: outer.z,
+
+    line: {
+      color: '#1f1f1f',
+      width: 5
+    },
+
+    name:
+      'global padded domain'
+
+  });
+
+
+  /* Sphere */
+
+  const sphere =
+    sphereMesh(
+      cx,
+      cy,
+      cz,
+      common.sphereRadiusCell
+    );
+
+
+  data.push({
+
+    type: 'mesh3d',
+
+    x: sphere.x,
+    y: sphere.y,
+    z: sphere.z,
+
+    i: sphere.i,
+    j: sphere.j,
+    k: sphere.k,
+
+    color:
+      '#2ca02c',
+
+    opacity:
+      0.55,
+
+    name:
+      'water sphere',
+
+    hovertemplate:
+      'water sphere<br>R = 100 cells = 5 mm<extra></extra>'
+
+  });
+
+
+  /* Incident wave */
+
+  data.push({
+
+    type: 'scatter3d',
+
+    mode: 'lines+text',
+
+    x: [-100, 40],
+
+    y: [cy, cy],
+
+    z: [cz, cz],
+
+    line: {
+
+      color:
+        '#d62728',
+
+      width:
+        8
+
+    },
+
+    text: [
+      '',
+      '+x incident wave'
+    ],
+
+    textposition:
+      'top center',
+
+    textfont: {
+
+      color:
+        '#d62728',
+
+      size:
+        14
+
+    },
+
+    name:
+      'incident wave',
+
+    hoverinfo:
+      'skip'
+
+  });
+
+
+  const zAspect =
+    Math.min(
+      2.1,
+      Nz / Nx
+    );
+
+
+  const layout = {
+
+    margin: {
+      l: 0,
+      r: 0,
+      t: 20,
+      b: 0
+    },
+
+    showlegend:
+      true,
+
+    legend: {
+
+      orientation:
+        'h',
+
+      x:
+        0.01,
+
+      y:
+        1.02,
+
+      bgcolor:
+        'rgba(255,255,255,0.8)'
+
+    },
+
+    scene: {
+
+      aspectmode:
+        'manual',
+
+      aspectratio: {
+
+        x:
+          1,
+
+        y:
+          1,
+
+        z:
+          zAspect
+
+      },
+
+      xaxis: {
+
+        title:
+          'x [cell]',
+
+        range: [
+          -110,
+          Nx + 40
+        ]
+
+      },
+
+      yaxis: {
+
+        title:
+          'y [cell]',
+
+        range: [
+          0,
+          Ny
+        ]
+
+      },
+
+      zaxis: {
+
+        title:
+          'z [cell]',
+
+        range: [
+          0,
+          Nz
+        ]
+
+      },
+
+      camera: {
+
+        eye: {
+          x: 1.55,
+          y: 1.35,
+          z: 1.15
+        }
+
+      }
+
+    },
+
+    annotations: [
+
+      {
+
+        x: 0.02,
+        y: 0.02,
+
+        xref: 'paper',
+        yref: 'paper',
+
+        showarrow: false,
+
+        align: 'left',
+
+        bgcolor:
+          'rgba(255,255,255,0.85)',
+
+        bordercolor:
+          '#ccd4df',
+
+        text:
+          `<b>Fixed local domain</b><br>` +
+          `830 x 830 x 416 cells / rank<br>` +
+          `global Z = 416 x ${p} = ${Nz}<br>` +
+          `GPU count: ${p}`
+
+      }
+
+    ]
+
+  };
+
+
+  Plotly.react(
+
+    'weakPlot',
+
+    data,
+
+    layout,
+
+    {
+      responsive:
+        true,
+
+      displaylogo:
+        false
+    }
+
+  );
+
+
+  document.getElementById(
+    'weakTime'
+  ).innerText =
+    weak.times_ms[p-1].toFixed(2)
+    + ' ms';
+
+
+  document.getElementById(
+    'weakEfficiency'
+  ).innerText =
+    weak.efficiency[p-1].toFixed(2)
+    + ' %';
+
+
+  document.getElementById(
+    'weakGrid'
+  ).innerText =
+    `830 x 830 x ${Nz}`;
+
+}
+
+
+/* ================================================================
+   GPU selector
+   ================================================================ */
+
+function setGPUCount(p) {
+
+  currentGPUCount = p;
+
+
+  for (let i = 1; i <= 4; i++) {
+
+    const b =
+      document.getElementById(
+        'gpu' + i
+      );
+
+    if (i === p) {
+
+      b.classList.add(
+        'active'
+      );
+
+    } else {
+
+      b.classList.remove(
+        'active'
+      );
+
+    }
+
+  }
+
+
+  makeStrongPlot(p);
+
+  makeWeakPlot(p);
+
+}
+
+
+/* Initial view */
+
+setGPUCount(1);
+
+</script>
+
+</body>
+</html>
