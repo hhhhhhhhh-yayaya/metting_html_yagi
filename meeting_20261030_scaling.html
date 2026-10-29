@@ -222,7 +222,7 @@
     <code>R = 100 cells = 5.0 mm</code><br>
 
     水:
-    <code>2極Debyeモデル, 27 degC</code><br>
+    <code>Debyeモデル, 27 degC</code><br>
 
     PML:
     <code>15 cells / side</code><br>
@@ -328,80 +328,6 @@
   </div>
 
 </div>
-
-
-<!-- Timing -->
-<div class="timing">
-
-  <h2>計算時間の測定方法</h2>
-
-  <div>
-    10 stepsのwarmup後に, MPI rankおよびGPUを同期してから計測を開始する.
-  </div>
-
-  <div class="timing-flow">
-
-    <div class="timing-box">MPI_Barrier</div>
-
-    <div class="arrow">&rarr;</div>
-
-    <div class="timing-box">cudaDeviceSynchronize</div>
-
-    <div class="arrow">&rarr;</div>
-
-    <div class="timing-box">MPI_Barrier</div>
-
-    <div class="arrow">&rarr;</div>
-
-    <div class="timing-box">MPI_Wtime</div>
-
-    <div class="arrow">&rarr;</div>
-
-    <div class="timing-box">100 steps</div>
-
-    <div class="arrow">&rarr;</div>
-
-    <div class="timing-box">cudaDeviceSynchronize</div>
-
-    <div class="arrow">&rarr;</div>
-
-    <div class="timing-box">MPI_Barrier</div>
-
-    <div class="arrow">&rarr;</div>
-
-    <div class="timing-box">MPI_Wtime</div>
-
-  </div>
-
-
-  <div class="note">
-
-    <b>MPI_Barrier:</b>
-    すべてのMPI rankが同じ地点に到達するまで待機し,
-    rank間の計測開始時刻をそろえる.<br>
-
-    <b>cudaDeviceSynchronize:</b>
-    GPU上で発行済みのkernelやmemory copyがすべて終了するまで待機し,
-    warmup中のGPU処理が測定区間に残らないようにする.<br>
-
-    <b>MPI_Wtime:</b>
-    測定開始時刻および終了時刻を取得する.<br><br>
-
-    測定区間には,
-    分散媒質の畳み込み計算,
-    入射波の計算,
-    電界の更新,
-    電界に対するPML処理およびhalo通信,
-    磁界の更新,
-    磁界に対するPML処理およびhalo通信を含む.<br>
-
-    メモリ確保や初期化など,
-    解析開始時に一度だけ行われる処理は測定区間には含めていない.
-
-  </div>
-
-</div>
-
 
 
 <script>
