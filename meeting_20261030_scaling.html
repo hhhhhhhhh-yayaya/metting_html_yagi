@@ -193,13 +193,11 @@
   </style>
 </head>
 
-
 <body>
 
 <div class="header">
 
   <h1>FDTD Scaling解析モデル</h1>
-
 
   <div class="summary">
 
@@ -235,7 +233,6 @@
 
   </div>
 
-
   <div class="controls">
 
     <span>GPU数:</span>
@@ -249,9 +246,7 @@
 
 </div>
 
-
 <div class="container">
-
 
   <!-- Strong scaling -->
   <div class="panel">
@@ -287,7 +282,6 @@
 
   </div>
 
-
   <!-- Weak scaling -->
   <div class="panel">
 
@@ -296,7 +290,7 @@
     <p>
       1 GPUあたりのlocal problem sizeを固定し,
       GPU数に比例してglobal domainをZ方向へ拡大する.
-      local padded gridは830 x 830 x 416 cells / rankである.
+      local padded gridは670 x 670 x 670 cells / rankである.
     </p>
 
     <div id="weakPlot" class="plot"></div>
@@ -323,7 +317,6 @@
   </div>
 
 </div>
-
 
 <script>
 
@@ -380,28 +373,28 @@ const strong = {
 
 
 /* Weak scaling:
-   local padded grid = 830 x 830 x 416 / rank
+   local padded grid = 670 x 670 x 670 / rank
 */
 
 const weak = {
 
-  Nx: 830,
-  Ny: 830,
+  Nx: 670,
+  Ny: 670,
 
-  NzLocal: 416,
+  NzLocal: 670,
 
   times_ms: [
-    52.54,
-    54.19,
-    58.92,
-    59.20
+    55.21,
+    56.25,
+    61.60,
+    61.98
   ],
 
   efficiency: [
-    100.00,
-    96.96,
-    89.17,
-    88.76
+    100.0,
+    98.2,
+    89.6,
+    89.1
   ]
 
 };
@@ -1027,7 +1020,7 @@ function makeWeakPlot(p) {
   const data = [];
 
 
-  /* Each rank has exactly 416 planes */
+  /* Each rank has exactly 670 planes */
 
   for (let r = 0; r < p; r++) {
 
@@ -1075,7 +1068,7 @@ function makeWeakPlot(p) {
 
       hovertemplate:
         `Rank ${r}<br>` +
-        `local grid = 830 x 830 x 416<br>` +
+        `local grid = 670 x 670 x 670<br>` +
         `Z = ${z0} -- ${z1-1}` +
         `<extra></extra>`
 
@@ -1383,8 +1376,8 @@ function makeWeakPlot(p) {
 
         text:
           `<b>Fixed local domain</b><br>` +
-          `830 x 830 x 416 cells / rank<br>` +
-          `global Z = 416 x ${p} = ${Nz}<br>` +
+          `670 x 670 x 670 cells / rank<br>` +
+          `global Z = 670 x ${p} = ${Nz}<br>` +
           `GPU count: ${p}`
 
       }
@@ -1430,7 +1423,7 @@ function makeWeakPlot(p) {
   document.getElementById(
     'weakGrid'
   ).innerText =
-    `830 x 830 x ${Nz}`;
+    `670 x 670 x ${Nz}`;
 
 }
 
